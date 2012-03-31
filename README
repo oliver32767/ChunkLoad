@@ -1,0 +1,15 @@
+ChunkLoad
+
+A Bukkit plugin to prevent selected chunks from unloading
+Inspired by ForeverALoad by Piedo_bear which is discontinued as of Minecraft 1.2
+
+Requires WorldEdit
+
+Usage:
+/chunkload add <name> - adds the chunks of the current selection as region <name> and prevents them from unloading
+/chunkload remove <name> - deletes the region, so it may be unloaded again
+/chunkload list [page] - lists the currently defined regions
+/chunkload select <name> - Sets your WorldEdit selection to the chunks of region <name>
+
+/cl is an alias to /chunkload
+all subcommands can be abbreviated to their first letter

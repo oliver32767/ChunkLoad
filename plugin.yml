@@ -1,0 +1,13 @@
+name: ChunkLoad
+main: com.github.nidan.chunkload.ChunkLoadPlugin
+version: 0.2
+depend: [WorldEdit]
+commands:
+    chunkload:
+       aliases: [cl]
+       description: The ChunkLoad command.
+       usage: /<command> list [page]|select <name>|add <name>|remove <name>
+permissions:
+    chunkload.usage:
+        description: Allows usage of ChunkLoad 
+        default: op
