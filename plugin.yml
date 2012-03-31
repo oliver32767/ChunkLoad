@@ -1,6 +1,6 @@
 name: ChunkLoad
 main: com.github.nidan.chunkload.ChunkLoadPlugin
-version: 0.2
+version: 0.3
 depend: [WorldEdit]
 commands:
     chunkload:

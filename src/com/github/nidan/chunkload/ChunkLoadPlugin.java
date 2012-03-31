@@ -200,12 +200,20 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		}
 		else if(args[0].equals("list") || args[0].equals("l"))
 		{
-			if(conf.getConfigurationSection(w) == null) {sender.sendMessage(ChatColor.YELLOW + "No regions in this world.");}
+			if(conf.getConfigurationSection(w) == null)
+			{
+				sender.sendMessage(ChatColor.YELLOW + "No regions in this world.");
+				return true;
+			}
 			Set<String> regions = conf.getConfigurationSection(w).getKeys(false);
 			int start = 1;
 			if(args.length >= 2)
 			{
-				try {start = Integer.parseInt(args[1]);}
+				try
+				{
+					start = Integer.parseInt(args[1]);
+					start = start * 10 - 9;
+				}
 				catch (NumberFormatException e) {start = 1;}
 			}
 			int done = -start + 1;
