@@ -234,7 +234,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				int zmax = conf.getInt(w + "." + r + ".zmax");
 				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
 				done++;
-				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + ": (" + xmin + ", " + zmin + ") - (" + xmax + ", " + zmax + ")");
+				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + ": " + (xmin * 16) + "," + (zmin * 16) + " - " + (xmax * 16 + 15) + "," + (zmax * 16 + 15) + " (" + ((xmax - xmin + 1) * (zmax - zmin + 1)) + " Chunks)");
 				if(done >= 10) {break;}
 			}
 			if(done == 0) {sender.sendMessage(ChatColor.YELLOW + "There are only " + (start - done) + " regionsd defined.");}
