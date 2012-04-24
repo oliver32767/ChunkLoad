@@ -18,6 +18,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.event.world.WorldInitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.sk89q.wepif.PermissionsResolverManager;
@@ -72,10 +73,17 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	
 	private void loadData(String w)
 	{
+		World world = null;
+		for(World cw : getServer().getWorlds()) {if(sanitizeWorld(cw.getName()).equals(w)) {world = cw; break;}}
+		if(world != null) {loadData(w, world);}
+	}
+	
+	private void loadData(String w, World world)
+	{
 		ConfigurationSection worldconf = conf.getConfigurationSection("worlds." + w);
+		if(worldconf == null) {return;}
 		Set<String> regions = worldconf.getKeys(false);
 		Set<Chunk> chunks = new HashSet<Chunk>();
-		World world = getServer().getWorld(w);
 		for(String r: regions)
 		{
 			ConfigurationSection regionconf = worldconf.getConfigurationSection(r);
@@ -108,7 +116,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		Player player;
 		player = (Player) sender;
 		World world = player.getWorld();
-		String w = world.getName();
+		String w = sanitizeWorld(world.getName());
 		
 		if(!PermissionsResolverManager.getInstance().hasPermission(player, "chunkload.usage") || (ops && player.isOp()))
 		{
@@ -126,7 +134,11 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		 */
 		else if((args[0].equals("add") || args[0].equals("a")) && args.length >= 2)
 		{
-			if(conf.contains("worlds." + w + "." + args[1]))
+			if(!acceptableName(args[1]))
+			{
+				sender.sendMessage(ChatColor.RED + "Invalid region name; only A-Za-z0-9_ are allowed!");
+			}
+			else if(conf.contains("worlds." + w + "." + args[1]))
 			{
 				sender.sendMessage(ChatColor.RED + "Region '" + args[1] + "' already exists in this world!");
 				return true;
@@ -177,7 +189,11 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		}
 		else if((args[0].equals("remove") || args[0].equals("rm") || args[0].equals("r")) && args.length >= 2)
 		{
-			if(conf.contains("worlds." + w + "." + args[1]))
+			if(!acceptableName(args[1]))
+			{
+				sender.sendMessage(ChatColor.RED + "Invalid region name; only A-Za-z0-9_ are allowed!");
+			}
+			else if(conf.contains("worlds." + w + "." + args[1]))
 			{
 				conf.set("worlds." + w + "." + args[1], null);
 				saveConfig();
@@ -189,7 +205,11 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		}
 		else if((args[0].equals("select") || args[0].equals("s")) && args.length >= 2)
 		{
-			if(conf.contains(w + "." + args[1]))
+			if(!acceptableName(args[1]))
+			{
+				sender.sendMessage(ChatColor.RED + "Invalid region name; only A-Za-z0-9_ are allowed!");
+			}
+			else if(conf.contains(w + "." + args[1]))
 			{
 				int xmin = conf.getInt(w + "." + args[1] + ".xmin");
 				int xmax = conf.getInt(w + "." + args[1] + ".xmax");
@@ -269,7 +289,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	public void onChunkUnload(ChunkUnloadEvent e)
 	{
 		// Get relevant data from the event
-		String w = e.getWorld().getName();
+		String w = sanitizeWorld(e.getWorld().getName());
 		Chunk c = e.getChunk();
 		
 		// check if chunk can unload via rectangles or a chunk list
@@ -279,5 +299,22 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			e.setCancelled(true);
 			return;
 		}
+	}
+	
+	@EventHandler
+	public void onWorldInit(WorldInitEvent e)
+	{
+		World world = e.getWorld();
+		loadData(sanitizeWorld(world.getName()), world);
+	}
+	
+	private String sanitizeWorld(String w)
+	{
+		return w.replaceAll("\\.", "");
+	}
+	
+	private boolean acceptableName(String s)
+	{
+		return s.matches("^[A-Za-z0-9_]*$");
 	}
 }
