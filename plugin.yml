@@ -6,7 +6,7 @@ commands:
     chunkload:
        aliases: [cl]
        description: The ChunkLoad command.
-       usage: /<command> list [page]|select <name>|add <name>|remove <name>
+       usage: /<command> list [page]|select <name>|add <name>|remove <name>|reload
 permissions:
     chunkload.usage:
         description: Allows usage of ChunkLoad 
