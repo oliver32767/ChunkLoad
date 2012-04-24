@@ -32,6 +32,8 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	private FileConfiguration conf;
 	private WorldEditPlugin we;
 	
+	boolean ops;
+	
 	public ChunkLoadPlugin()
 	{
 		keep_loaded = new HashMap<String, Set<Chunk>>();
@@ -51,13 +53,26 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	private void loadData()
 	{
 		conf = getConfig();
-		Set<String> worlds = conf.getKeys(false);
+		if(!conf.contains("worlds"))
+		{
+			if(conf.getConfigurationSection("worlds").getKeys(false).size() > 0)
+			{
+				/* silently update config file of previous versions - move anything to worlds */
+				conf.createSection("worlds", conf.getValues(true));
+				for(String k : conf.getKeys(false)) {if(!k.equals("worlds")) {conf.set(k, null);}}
+			}
+			else {conf.createSection("worlds");}
+		}
+		if(!conf.isBoolean("allow-ops")) {conf.set("allow-ops", true);}
+		ops = conf.getBoolean("allow-ops");
+		Set<String> worlds = conf.getConfigurationSection("worlds").getKeys(false);
 		for(String w: worlds) {loadData(w);}
+		saveConfig();
 	}
 	
 	private void loadData(String w)
 	{
-		ConfigurationSection worldconf = conf.getConfigurationSection(w);
+		ConfigurationSection worldconf = conf.getConfigurationSection("worlds." + w);
 		Set<String> regions = worldconf.getKeys(false);
 		Set<Chunk> chunks = new HashSet<Chunk>();
 		World world = getServer().getWorld(w);
@@ -95,7 +110,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		World world = player.getWorld();
 		String w = world.getName();
 		
-		if(!PermissionsResolverManager.getInstance().hasPermission(player, "chunkload.usage"))
+		if(!PermissionsResolverManager.getInstance().hasPermission(player, "chunkload.usage") || (ops && player.isOp()))
 		{
 			sender.sendMessage(ChatColor.RED + "You don't have permission to use this.");
 			return true;
@@ -111,7 +126,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		 */
 		else if((args[0].equals("add") || args[0].equals("a")) && args.length >= 2)
 		{
-			if(conf.contains(w + "." + args[1]))
+			if(conf.contains("worlds." + w + "." + args[1]))
 			{
 				sender.sendMessage(ChatColor.RED + "Region '" + args[1] + "' already exists in this world!");
 				return true;
@@ -139,7 +154,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			int zmax = sel.getMaximumPoint().getChunk().getZ();
 			if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
 			
-			ConfigurationSection r = conf.createSection(w + "." + args[1]); 
+			ConfigurationSection r = conf.createSection("worlds." + w + "." + args[1]); 
 			r.set("xmin", xmin);
 			r.set("xmax", xmax);
 			r.set("zmin", zmin);
@@ -162,9 +177,9 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		}
 		else if((args[0].equals("remove") || args[0].equals("rm") || args[0].equals("r")) && args.length >= 2)
 		{
-			if(conf.contains(w + "." + args[1]))
+			if(conf.contains("worlds." + w + "." + args[1]))
 			{
-				conf.set(w + "." + args[1], null);
+				conf.set("worlds." + w + "." + args[1], null);
 				saveConfig();
 				loadData(w);
 				sender.sendMessage(ChatColor.YELLOW + "Region '" + args[1] + "' removed");
@@ -205,7 +220,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				sender.sendMessage(ChatColor.YELLOW + "No regions in this world.");
 				return true;
 			}
-			Set<String> regions = conf.getConfigurationSection(w).getKeys(false);
+			Set<String> regions = conf.getConfigurationSection("worlds." + w).getKeys(false);
 			int start = 1;
 			if(args.length >= 2)
 			{
@@ -234,11 +249,17 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				int zmax = conf.getInt(w + "." + r + ".zmax");
 				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
 				done++;
-				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + ": " + (xmin * 16) + "," + (zmin * 16) + " - " + (xmax * 16 + 15) + "," + (zmax * 16 + 15) + " (" + ((xmax - xmin + 1) * (zmax - zmin + 1)) + " Chunks)");
+				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + ": (" + (xmin * 16) + "," + (zmin * 16) + ") (" + (xmax * 16 + 15) + "," + (zmax * 16 + 15) + ") - " + ((xmax - xmin + 1) * (zmax - zmin + 1)) + " Chunks");
 				if(done >= 10) {break;}
 			}
 			if(done == 0) {sender.sendMessage(ChatColor.YELLOW + "There are only " + (start - done) + " regionsd defined.");}
 			return true;
+		}
+		else if(args[0].equals("reload"))
+		{
+			keep_loaded.clear();
+			loadData();
+			sender.sendMessage(ChatColor.YELLOW + "Configuratio reloaded.");
 		}
 		
 		return false;	
