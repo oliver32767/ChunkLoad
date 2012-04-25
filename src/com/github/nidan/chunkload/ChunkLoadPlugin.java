@@ -32,9 +32,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	private Map<String, Set<Chunk>> keep_loaded;
 	private FileConfiguration conf;
 	private WorldEditPlugin we;
-	
-	boolean ops;
-	
+		
 	public ChunkLoadPlugin()
 	{
 		keep_loaded = new HashMap<String, Set<Chunk>>();
@@ -64,8 +62,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			}
 			else {conf.createSection("worlds");}
 		}
-		if(!conf.isBoolean("allow-ops")) {conf.set("allow-ops", true);}
-		ops = conf.getBoolean("allow-ops");
+		if(!conf.contains("allow-ops")) {conf.set("allow-ops", true);}
 		Set<String> worlds = conf.getConfigurationSection("worlds").getKeys(false);
 		for(String w: worlds) {loadData(w);}
 		saveConfig();
@@ -111,14 +108,14 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		if(!(sender instanceof Player))
 		{
 			sender.sendMessage("Must be used by a Player");
-			return false;
+			return true;
 		}
 		Player player;
 		player = (Player) sender;
 		World world = player.getWorld();
 		String w = sanitizeName(world.getName());
 		
-		if(!PermissionsResolverManager.getInstance().hasPermission(player, "chunkload.usage") || (ops && player.isOp()))
+		if(!PermissionsResolverManager.getInstance().hasPermission(player, "chunkload.usage") && !(conf.getBoolean("allow-ops") && player.isOp()))
 		{
 			sender.sendMessage(ChatColor.RED + "You don't have permission to use this.");
 			return true;
@@ -166,7 +163,9 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			int zmax = sel.getMaximumPoint().getChunk().getZ();
 			if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
 			
-			ConfigurationSection r = conf.createSection("worlds." + w + "." + args[1]); 
+			ConfigurationSection wc = conf.getConfigurationSection("worlds." + w);
+			if(wc == null) {wc = conf.createSection("worlds." + w);}
+			ConfigurationSection r = wc.createSection(args[1]); 
 			r.set("xmin", xmin);
 			r.set("xmax", xmax);
 			r.set("zmin", zmin);
@@ -209,13 +208,13 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			{
 				sender.sendMessage(ChatColor.RED + "Invalid region name!");
 			}
-			else if(conf.contains(w + "." + args[1]))
+			else if(conf.contains("worlds." + w + "." + args[1]))
 			{
-				int xmin = conf.getInt(w + "." + args[1] + ".xmin");
-				int xmax = conf.getInt(w + "." + args[1] + ".xmax");
+				int xmin = conf.getInt("worlds." + w + "." + args[1] + ".xmin");
+				int xmax = conf.getInt("worlds." + w + "." + args[1] + ".xmax");
 				if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
-				int zmin = conf.getInt(w + "." + args[1] + ".zmin");
-				int zmax = conf.getInt(w + "." + args[1] + ".zmax");
+				int zmin = conf.getInt("worlds." + w + "." + args[1] + ".zmin");
+				int zmax = conf.getInt("worlds." + w + "." + args[1] + ".zmax");
 				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;} 
 				
 				xmin *= 16;
@@ -242,6 +241,11 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			}
 			ConfigurationSection worldconf = conf.getConfigurationSection("worlds." + w);
 			Set<String> regions = worldconf.getKeys(false);
+			if(regions.size() == 0)
+			{
+				sender.sendMessage(ChatColor.YELLOW + "No regions in this world.");
+				return true;
+			}
 			int start = 1;
 			if(args.length >= 2)
 			{
@@ -278,9 +282,9 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		}
 		else if(args[0].equals("reload"))
 		{
-			keep_loaded.clear();
-			loadData();
-			sender.sendMessage(ChatColor.YELLOW + "Configuratio reloaded.");
+			//keep_loaded.clear();
+			//loadData();
+			sender.sendMessage(ChatColor.RED + "This doesn't work yet...");
 			return true;
 		}
 		

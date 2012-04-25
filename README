@@ -10,7 +10,8 @@ Usage:
 /chunkload remove <name> - deletes the region, so it may be unloaded again
 /chunkload list [page] - lists the currently defined regions
 /chunkload select <name> - Sets your WorldEdit selection to the chunks of region <name>
-/chunkload reload - rereads the configuration file
+
+/chunkload reload - rereads the configuration file - TODO: this doesn't work
 
 /cl is an alias to /chunkload
 all subcommands except reload can be abbreviated to their first letter
@@ -21,5 +22,7 @@ Configuration:
 allow-ops - allow operators to use ChunkLoad even if they don't have the required permissions; default: true
 worlds.<worldname>.<regionname> - rectangles of chunks to keep loaded, manual editing at your own risk
 
+Todo:
+- have a look at the ForeverALoad features and implement them
 
 This plugin is licensed under GPLv2 or (at your option) any later version
