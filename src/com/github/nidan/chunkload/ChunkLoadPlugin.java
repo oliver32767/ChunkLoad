@@ -1,7 +1,7 @@
 package com.github.nidan.chunkload;
 
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
@@ -29,13 +29,18 @@ import com.sk89q.worldedit.bukkit.selections.Selection;
 
 public class ChunkLoadPlugin extends JavaPlugin implements Listener
 {
-	private Map<String, Set<Chunk>> keep_loaded;
+	private Map<String, Map<Chunk, ChunkLoadChunk>> keep_loaded;
 	private FileConfiguration conf;
 	private WorldEditPlugin we;
+	
+	/* MUST be sorted */
+	public static final String[] specialregions = {"__global__"};
+	/* MUST be sorted */
+	public static final String[] regionoptions = {"inactive", "load-on-start"};
 		
 	public ChunkLoadPlugin()
-	{
-		keep_loaded = new HashMap<String, Set<Chunk>>();
+	{		
+		keep_loaded = new HashMap<String, Map<Chunk, ChunkLoadChunk>>();
 	}
 	
 	public void onEnable()
@@ -80,19 +85,25 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		ConfigurationSection worldconf = conf.getConfigurationSection("worlds." + w);
 		if(worldconf == null) {return;}
 		Set<String> regions = worldconf.getKeys(false);
-		Set<Chunk> chunks = new HashSet<Chunk>();
+		Map<Chunk, ChunkLoadChunk> chunks = new HashMap<Chunk, ChunkLoadChunk>();
 		for(String r: regions)
 		{
-			ConfigurationSection regionconf = worldconf.getConfigurationSection(r);
-			int xmin = regionconf.getInt("xmin");
-			int xmax = regionconf.getInt("xmax");
+			ConfigurationSection rc = worldconf.getConfigurationSection(r);
+			int xmin = rc.getInt("xmin");
+			int xmax = rc.getInt("xmax");
 			if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
-			int zmin = regionconf.getInt("zmin");
-			int zmax = regionconf.getInt("zmax");
+			int zmin = rc.getInt("zmin");
+			int zmax = rc.getInt("zmax");
 			if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
+			boolean load = rc.getBoolean("config.load-on-start");
 			for(int x = xmin; x <= xmax; x++) for(int z = zmin; z <= zmax; z++)
 			{
-				chunks.add(world.getChunkAt(x, z));
+				Chunk c = world.getChunkAt(x, z);
+				ChunkLoadChunk clc = chunks.get(c);
+				if(clc == null) {clc = new ChunkLoadChunk(c);}
+				clc.addRegion(rc);
+				chunks.put(c, clc);
+				if(load) {c.load(false);}
 			}
 		}
 		keep_loaded.put(w, chunks);
@@ -117,7 +128,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		
 		if(!PermissionsResolverManager.getInstance().hasPermission(player, "chunkload.usage") && !(conf.getBoolean("allow-ops") && player.isOp()))
 		{
-			sender.sendMessage(ChatColor.RED + "You don't have permission to use this.");
+			sender.sendMessage(ChatColor.RED + "You don't have permission to use this!");
 			return true;
 		}
 		
@@ -126,14 +137,17 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		/*
 		 * a/add name
 		 * r/rm/remove name
-		 * list [#]
-		 * select name
+		 * l/list [#]
+		 * s/select name
+		 * c/config name [option [value]]
+		 * reload
 		 */
 		else if((args[0].equals("add") || args[0].equals("a")) && args.length >= 2)
 		{
 			if(!acceptableName(args[1]))
 			{
 				sender.sendMessage(ChatColor.RED + "Invalid region name!");
+				return true;
 			}
 			else if(conf.contains("worlds." + w + "." + args[1]))
 			{
@@ -153,7 +167,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			Selection sel = we.getSelection(player);
 			if(sel == null || sel.getWorld() != world)
 			{
-				sender.sendMessage(ChatColor.RED + "Your selection is not in this world");
+				sender.sendMessage(ChatColor.RED + "Your selection is not in this world.");
 				return true;
 			}
 			int xmin = sel.getMinimumPoint().getChunk().getX();
@@ -173,15 +187,20 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			
 			saveConfig();
 			
-			Set<Chunk> chunks = keep_loaded.get(w);
+			Map<Chunk, ChunkLoadChunk> chunks = keep_loaded.get(w);
 			if(chunks == null)
 			{
-				chunks = new HashSet<Chunk>();
+				chunks = new HashMap<Chunk, ChunkLoadChunk>();
 				keep_loaded.put(w, chunks);
+				
 			}
 			for(int x = xmin ; x <= xmax; x++) for(int z = zmin; z <= zmax; z++)
 			{
-				chunks.add(world.getChunkAt(x, z));
+				Chunk c = world.getChunkAt(x, z);
+				ChunkLoadChunk clc = chunks.get(c);
+				if(clc == null) {clc = new ChunkLoadChunk(world.getChunkAt(x, z));}
+				clc.addRegion(r);
+				chunks.put(c, clc);
 			}
 			sender.sendMessage(ChatColor.YELLOW + "Keeping " + (xmax - xmin + 1) * (zmax - zmin + 1) + " chunks loaded in region '" + args[1] + "'."); 
 			return true;
@@ -194,9 +213,27 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			}
 			else if(conf.contains("worlds." + w + "." + args[1]))
 			{
+				ConfigurationSection r = conf.getConfigurationSection("worlds." + w + "." + args[1]);
+				int xmin = r.getInt("xmin");
+				int xmax = r.getInt("xmax");
+				if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
+				int zmin = r.getInt("zmin");
+				int zmax = r.getInt("zmax");
+				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
 				conf.set("worlds." + w + "." + args[1], null);
 				saveConfig();
-				loadData(w);
+				
+				Map<Chunk, ChunkLoadChunk> chunks = keep_loaded.get(w);
+				if(chunks != null)
+				{
+					for(int x = xmin ; x <= xmax; x++) for(int z = zmin; z <= zmax; z++)
+					{
+						ChunkLoadChunk clc = chunks.get(world.getChunkAt(x, z));
+						clc.removeRegion(r);
+						if(clc.getRegions().size() <= 0) {chunks.remove(world.getChunkAt(x, z));}
+					}
+				}
+				
 				sender.sendMessage(ChatColor.YELLOW + "Region '" + args[1] + "' removed");
 			}
 			else {sender.sendMessage(ChatColor.RED + "Region '" + args[1] + "' doesn't exist in this world!");}
@@ -210,11 +247,12 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			}
 			else if(conf.contains("worlds." + w + "." + args[1]))
 			{
-				int xmin = conf.getInt("worlds." + w + "." + args[1] + ".xmin");
-				int xmax = conf.getInt("worlds." + w + "." + args[1] + ".xmax");
+				ConfigurationSection r = conf.getConfigurationSection("worlds." + w + "." + args[1]);
+				int xmin = r.getInt("xmin");
+				int xmax = r.getInt("xmax");
 				if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
-				int zmin = conf.getInt("worlds." + w + "." + args[1] + ".zmin");
-				int zmax = conf.getInt("worlds." + w + "." + args[1] + ".zmax");
+				int zmin = r.getInt("zmin");
+				int zmax = r.getInt("zmax");
 				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;} 
 				
 				xmin *= 16;
@@ -239,8 +277,8 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				sender.sendMessage(ChatColor.YELLOW + "No regions in this world.");
 				return true;
 			}
-			ConfigurationSection worldconf = conf.getConfigurationSection("worlds." + w);
-			Set<String> regions = worldconf.getKeys(false);
+			ConfigurationSection wc = conf.getConfigurationSection("worlds." + w);
+			Set<String> regions = wc.getKeys(false);
 			if(regions.size() == 0)
 			{
 				sender.sendMessage(ChatColor.YELLOW + "No regions in this world.");
@@ -267,17 +305,86 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 					done++;
 					continue;
 				}
-				int xmin = worldconf.getInt(r + ".xmin");
-				int xmax = worldconf.getInt(r + ".xmax");
+				int xmin = wc.getInt(r + ".xmin");
+				int xmax = wc.getInt(r + ".xmax");
 				if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
-				int zmin = worldconf.getInt(r + ".zmin");
-				int zmax = worldconf.getInt(r + ".zmax");
+				int zmin = wc.getInt(r + ".zmin");
+				int zmax = wc.getInt(r + ".zmax");
 				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
 				done++;
-				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + ": (" + (xmin * 16) + "," + (zmin * 16) + ") (" + (xmax * 16 + 15) + "," + (zmax * 16 + 15) + ") - " + ((xmax - xmin + 1) * (zmax - zmin + 1)) + " Chunks");
+				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + ": " + coords(xmin, xmax, zmin, zmax) + (wc.getBoolean(r + ".config.inactive")? ChatColor.AQUA + " - inactive" : ""));
 				if(done >= 10) {break;}
 			}
 			if(done == 0) {sender.sendMessage(ChatColor.YELLOW + "There are only " + (start - done) + " regionsd defined.");}
+			return true;
+		}
+		else if((args[0].equals("configure") || args[0].equals("config") || args[0].equals("c")) && args.length >= 2)
+		{
+			if(!acceptableName(args[1]))
+			{
+				sender.sendMessage(ChatColor.RED + "Invalid region name!");
+			}
+			else if(conf.contains("worlds." + w + "." + args[1]))
+			{
+				ConfigurationSection rc;
+				if(!conf.contains("worlds." + w + "." + args[1] + ".config")) {rc = conf.getConfigurationSection("worlds." + w + "." + args[1]).createSection("config");}
+				else {rc = conf.getConfigurationSection("worlds." + w + "." + args[1] + ".config");}
+				
+				if(args.length == 2)
+				{//show configuration
+					ConfigurationSection r = conf.getConfigurationSection("worlds." + w + "." + args[1]);
+					int xmin = r.getInt("xmin");
+					int xmax = r.getInt("xmax");
+					if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
+					int zmin = r.getInt("zmin");
+					int zmax = r.getInt("zmax");
+					if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
+					sender.sendMessage(ChatColor.YELLOW + args[1] + ": " + coords(xmin, xmax, zmin, zmax));
+					
+					String msg = "";
+					for(String o: regionoptions) {if(rc.getBoolean(o)) {msg += ", " + o;}}
+					sender.sendMessage(ChatColor.YELLOW + "Configuration: " + ChatColor.AQUA + (msg.length() > 0? msg.substring(2) : "default"));
+				}
+				else if(args.length == 3)
+				{//delete option
+					if(args[2].charAt(0) == '-' && Arrays.binarySearch(regionoptions, args[2].substring(1)) >= 0)
+					{
+						rc.set(args[2].substring(1), null);
+						sender.sendMessage(ChatColor.YELLOW + "Option " + args[2].substring(1) + " cleared.");
+					}
+					else if(Arrays.binarySearch(regionoptions, args[2]) >= 0)
+					{
+						sender.sendMessage(ChatColor.YELLOW + "Option " + args[2] + " is " + (rc.contains(args[2])? "set to " + rc.getBoolean(args[2]) + "." : "not set."));
+					}
+					else {sender.sendMessage(ChatColor.RED + "No such option!");}
+				}
+				else
+				{//set option
+					if(Arrays.binarySearch(regionoptions, args[2]) >= 0)
+					{
+						if(args[3].equalsIgnoreCase("default"))
+						{
+							rc.set(args[2], null);
+							sender.sendMessage(ChatColor.YELLOW + "Option " + args[2] + " cleared.");
+						}
+						else
+						{
+							rc.set(args[2], Boolean.parseBoolean(args[3]));
+							sender.sendMessage(ChatColor.YELLOW + "Option " + args[2] + " set to " + rc.getBoolean(args[2]));
+						}
+					}
+					else {sender.sendMessage(ChatColor.RED + "No such option!");}
+				}
+				saveConfig();
+			}
+			else {sender.sendMessage(ChatColor.RED + "Region '" + args[1] + "' doesn't exist in this world!");}
+			return true;
+		}
+		else if(args[0].equals("options"))
+		{
+			String msg = "";
+			for(String o : regionoptions) {msg += ", " + o;}
+			sender.sendMessage(ChatColor.YELLOW + "Available Options:" + ChatColor.AQUA + msg.substring(1));
 			return true;
 		}
 		else if(args[0].equals("reload"))
@@ -300,10 +407,17 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		
 		// check if chunk can unload via rectangles or a chunk list
 		// cancel the unload event if it's not supposed to unload
-		if(keep_loaded.get(w) != null && keep_loaded.get(w).contains(c))
+		if(keep_loaded.get(w) != null && keep_loaded.get(w).containsKey(c))
 		{
-			e.setCancelled(true);
-			return;
+			ChunkLoadChunk clc = keep_loaded.get(w).get(c);
+			for(ConfigurationSection r : clc.getRegions())
+			{
+				if(!r.getBoolean("config.inactive"))
+				{
+					e.setCancelled(true);
+					return;
+				}
+			}
 		}
 	}
 	
@@ -321,6 +435,11 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	
 	private boolean acceptableName(String s)
 	{
-		return s.indexOf('.') == -1;
+		return s.indexOf('.') == -1 && (s.substring(0, 2).equals("__") == (Arrays.binarySearch(specialregions, s) >= 0));
+	}
+	
+	private String coords(int xmin, int xmax, int zmin, int zmax)
+	{
+		return "(" + (xmin * 16) + "," + (zmin * 16) + ") (" + (xmax * 16 + 15) + "," + (zmax * 16 + 15) + ") - " + ((xmax - xmin + 1) * (zmax - zmin + 1)) + " Chunks";
 	}
 }

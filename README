@@ -9,7 +9,16 @@ Usage:
 /chunkload add <name> - adds the chunks of the current selection as region <name> and prevents them from unloading
 /chunkload remove <name> - deletes the region, so it may be unloaded again
 /chunkload list [page] - lists the currently defined regions
-/chunkload select <name> - Sets your WorldEdit selection to the chunks of region <name>
+/chunkload select <name> - sets your WorldEdit selection to the chunks of region <name>
+
+/chunkload configure <name> - shows the region and its configuration
+/chunkload configure <name> <option> - shows the value of <option>
+/chunkload configure <name> <option> true|false|default - turns an option on or off for region <name>
+/chunkload configure <name> -<option> - (minus sign in front of the option) sets <option> to its default value (same as /chunkload configure <name> <option> default)
+
+/chunkload options - lists all available options:
+	- inactive: chunks of inactive regions may be unloaded; this can be used to temporarily disable a region
+	- load-on-start: load the chunks of this region into memory at server startup
 
 /chunkload reload - rereads the configuration file - TODO: this doesn't work
 
