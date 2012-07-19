@@ -4,16 +4,21 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.bukkit.Chunk;
+import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 
 public class ChunkLoadChunk
 {
-	Chunk chunk;
+	World world;
+	int x;
+	int z;
 	HashSet<ConfigurationSection> configs;
 	
-	ChunkLoadChunk(Chunk c)
+	ChunkLoadChunk(World w, Chunk c)
 	{
-		chunk = c;
+		world = w;
+		x = c.getX();
+		z = c.getZ();
 		configs = new HashSet<ConfigurationSection>();
 	}
 	
@@ -34,6 +39,6 @@ public class ChunkLoadChunk
 	
 	public Chunk getChunk()
 	{
-		return chunk;
+		return world.getChunkAt(x, z);
 	}
 }

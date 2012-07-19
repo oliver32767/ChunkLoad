@@ -1,5 +1,10 @@
 package com.github.nidan.chunkload;
 
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,7 +34,7 @@ import com.sk89q.worldedit.bukkit.selections.Selection;
 
 public class ChunkLoadPlugin extends JavaPlugin implements Listener
 {
-	private Map<String, Map<Chunk, ChunkLoadChunk>> keep_loaded;
+	private Map<String, Map<Long, ChunkLoadChunk>> keep_loaded;
 	private FileConfiguration conf;
 	private WorldEditPlugin we;
 	
@@ -40,7 +45,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		
 	public ChunkLoadPlugin()
 	{		
-		keep_loaded = new HashMap<String, Map<Chunk, ChunkLoadChunk>>();
+		keep_loaded = new HashMap<String, Map<Long, ChunkLoadChunk>>();
 	}
 	
 	public void onEnable()
@@ -85,10 +90,15 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		ConfigurationSection worldconf = conf.getConfigurationSection("worlds." + w);
 		if(worldconf == null) {return;}
 		Set<String> regions = worldconf.getKeys(false);
-		Map<Chunk, ChunkLoadChunk> chunks = new HashMap<Chunk, ChunkLoadChunk>();
+		Map<Long, ChunkLoadChunk> chunks = new HashMap<Long, ChunkLoadChunk>();
 		for(String r: regions)
 		{
 			ConfigurationSection rc = worldconf.getConfigurationSection(r);
+			if(r.equals("__global__"))
+			{
+				loadGlobal(w, world, chunks, rc);
+				continue;
+			}
 			int xmin = rc.getInt("xmin");
 			int xmax = rc.getInt("xmax");
 			if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
@@ -100,13 +110,55 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			{
 				Chunk c = world.getChunkAt(x, z);
 				ChunkLoadChunk clc = chunks.get(c);
-				if(clc == null) {clc = new ChunkLoadChunk(c);}
+				if(clc == null) {clc = new ChunkLoadChunk(world, c);}
 				clc.addRegion(rc);
-				chunks.put(c, clc);
+				chunks.put(chunk2long(c), clc);
 				if(load) {c.load(false);}
 			}
 		}
 		keep_loaded.put(w, chunks);
+	}
+	
+	private void loadGlobal(String w, World world, Map<Long, ChunkLoadChunk> chunks, ConfigurationSection rc)
+	{
+		for(File f: world.getWorldFolder().listFiles())
+		{
+			File regdir;
+			if(f.getName().startsWith("DIM")) {regdir = new File(f, "region");}
+			else if(f.getName().equals("region")) {regdir = f;}
+			else {continue;}
+			boolean load = rc.getBoolean("config.load-on-start");
+			
+			for(File region: regdir.listFiles())
+			{
+				String rn = region.getName();
+				if(!rn.matches("^r\\.-?[0-9]+\\.-?[0-9]+\\.mca$")) {continue;}
+				/* open file, read index, transform to chunks */
+				int x = Integer.parseInt(rn.substring(2));
+				int z = Integer.parseInt(rn.substring(rn.indexOf('.', 2) + 1));
+				try
+				{
+					DataInputStream d = new DataInputStream(new FileInputStream(region));
+					for(int i = 0; i < 1024; i++)
+					{
+						if(d.readInt() == 0) {continue;}
+						int cx = x * 32 + (i & 31);
+						int cz = z * 32 + ((i >> 5) & 31);
+						Chunk c = world.getChunkAt(cx, cz);
+						ChunkLoadChunk clc = chunks.get(c);
+						if(clc == null) {clc = new ChunkLoadChunk(world, c);}
+						clc.addRegion(rc);
+						chunks.put(chunk2long(c), clc);
+						if(load) {c.load(false);}
+					}
+					d.close();
+				}
+				/* error "handling" */
+				catch(FileNotFoundException e) {continue;}
+				catch(IOException e) {continue;}
+			}
+			break;
+		}
 	}
 	
 	public void onDisable()
@@ -187,10 +239,10 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			
 			saveConfig();
 			
-			Map<Chunk, ChunkLoadChunk> chunks = keep_loaded.get(w);
+			Map<Long, ChunkLoadChunk> chunks = keep_loaded.get(w);
 			if(chunks == null)
 			{
-				chunks = new HashMap<Chunk, ChunkLoadChunk>();
+				chunks = new HashMap<Long, ChunkLoadChunk>();
 				keep_loaded.put(w, chunks);
 				
 			}
@@ -198,9 +250,9 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			{
 				Chunk c = world.getChunkAt(x, z);
 				ChunkLoadChunk clc = chunks.get(c);
-				if(clc == null) {clc = new ChunkLoadChunk(world.getChunkAt(x, z));}
+				if(clc == null) {clc = new ChunkLoadChunk(world, world.getChunkAt(x, z));}
 				clc.addRegion(r);
-				chunks.put(c, clc);
+				chunks.put(chunk2long(c), clc);
 			}
 			sender.sendMessage(ChatColor.YELLOW + "Keeping " + (xmax - xmin + 1) * (zmax - zmin + 1) + " chunks loaded in region '" + args[1] + "'."); 
 			return true;
@@ -223,12 +275,12 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				conf.set("worlds." + w + "." + args[1], null);
 				saveConfig();
 				
-				Map<Chunk, ChunkLoadChunk> chunks = keep_loaded.get(w);
+				Map<Long, ChunkLoadChunk> chunks = keep_loaded.get(w);
 				if(chunks != null)
 				{
 					for(int x = xmin ; x <= xmax; x++) for(int z = zmin; z <= zmax; z++)
 					{
-						ChunkLoadChunk clc = chunks.get(world.getChunkAt(x, z));
+						ChunkLoadChunk clc = chunks.get(coords2long(x, z));
 						clc.removeRegion(r);
 						if(clc.getRegions().size() <= 0) {chunks.remove(world.getChunkAt(x, z));}
 					}
@@ -305,14 +357,21 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 					done++;
 					continue;
 				}
-				int xmin = wc.getInt(r + ".xmin");
-				int xmax = wc.getInt(r + ".xmax");
-				if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
-				int zmin = wc.getInt(r + ".zmin");
-				int zmax = wc.getInt(r + ".zmax");
-				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
+				if(r.equals("__global__"))
+				{
+					sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + " " + (wc.getBoolean(r + ".config.inactive")? ChatColor.AQUA + " - inactive" : ""));
+				}
+				else
+				{
+					int xmin = wc.getInt(r + ".xmin");
+					int xmax = wc.getInt(r + ".xmax");
+					if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
+					int zmin = wc.getInt(r + ".zmin");
+					int zmax = wc.getInt(r + ".zmax");
+					if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
+					sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + ": " + coords(xmin, xmax, zmin, zmax) + (wc.getBoolean(r + ".config.inactive")? ChatColor.AQUA + " - inactive" : ""));
+				}
 				done++;
-				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + ": " + coords(xmin, xmax, zmin, zmax) + (wc.getBoolean(r + ".config.inactive")? ChatColor.AQUA + " - inactive" : ""));
 				if(done >= 10) {break;}
 			}
 			if(done == 0) {sender.sendMessage(ChatColor.YELLOW + "There are only " + (start - done) + " regionsd defined.");}
@@ -403,18 +462,27 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	{
 		// Get relevant data from the event
 		String w = sanitizeName(e.getWorld().getName());
-		Chunk c = e.getChunk();
+		final Chunk c = e.getChunk();
 		
 		// check if chunk can unload via rectangles or a chunk list
 		// cancel the unload event if it's not supposed to unload
-		if(keep_loaded.get(w) != null && keep_loaded.get(w).containsKey(c))
+		if(keep_loaded.get(w) != null && keep_loaded.get(w).containsKey(chunk2long(c)))
 		{
-			ChunkLoadChunk clc = keep_loaded.get(w).get(c);
+			ChunkLoadChunk clc = keep_loaded.get(w).get(chunk2long(c));
 			for(ConfigurationSection r : clc.getRegions())
 			{
 				if(!r.getBoolean("config.inactive"))
 				{
 					e.setCancelled(true);
+					getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable()
+						{
+							@Override
+							public void run()
+							{
+								c.load(false);
+							}
+						}
+						, 1);
 					return;
 				}
 			}
@@ -428,18 +496,28 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		loadData(sanitizeName(world.getName()), world);
 	}
 	
-	private String sanitizeName(String w)
+	private static String sanitizeName(String w)
 	{
 		return w.replaceAll("\\.", "");
 	}
 	
-	private boolean acceptableName(String s)
+	private static boolean acceptableName(String s)
 	{
 		return s.indexOf('.') == -1 && (s.substring(0, 2).equals("__") == (Arrays.binarySearch(specialregions, s) >= 0));
 	}
 	
-	private String coords(int xmin, int xmax, int zmin, int zmax)
+	private static String coords(int xmin, int xmax, int zmin, int zmax)
 	{
 		return "(" + (xmin * 16) + "," + (zmin * 16) + ") (" + (xmax * 16 + 15) + "," + (zmax * 16 + 15) + ") - " + ((xmax - xmin + 1) * (zmax - zmin + 1)) + " Chunks";
+	}
+	
+	private static long chunk2long(Chunk c)
+	{
+		return (long) c.getX() << Integer.SIZE | c.getZ();
+	}
+	
+	private static long coords2long(int x, int z)
+	{
+		return (long) x << Integer.SIZE | z;
 	}
 }
