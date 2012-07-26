@@ -42,9 +42,9 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	public static final String[] specialregions = {"__global__"};
 	/* MUST be sorted */
 	public static final String[] regionoptions = {"inactive", "load-on-start"};
-		
+	
 	public ChunkLoadPlugin()
-	{		
+	{
 		keep_loaded = new HashMap<String, Map<Long, ChunkLoadChunk>>();
 	}
 	
@@ -231,7 +231,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			
 			ConfigurationSection wc = conf.getConfigurationSection("worlds." + w);
 			if(wc == null) {wc = conf.createSection("worlds." + w);}
-			ConfigurationSection r = wc.createSection(args[1]); 
+			ConfigurationSection r = wc.createSection(args[1]);
 			r.set("xmin", xmin);
 			r.set("xmax", xmax);
 			r.set("zmin", zmin);
@@ -244,7 +244,6 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			{
 				chunks = new HashMap<Long, ChunkLoadChunk>();
 				keep_loaded.put(w, chunks);
-				
 			}
 			for(int x = xmin ; x <= xmax; x++) for(int z = zmin; z <= zmax; z++)
 			{
@@ -268,7 +267,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				ConfigurationSection r = conf.getConfigurationSection("worlds." + w + "." + args[1]);
 				int xmin = r.getInt("xmin");
 				int xmax = r.getInt("xmax");
-				if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
+				if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;}
 				int zmin = r.getInt("zmin");
 				int zmax = r.getInt("zmax");
 				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
@@ -297,15 +296,19 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			{
 				sender.sendMessage(ChatColor.RED + "Invalid region name!");
 			}
+			else if(Arrays.binarySearch(specialregions, s) >= 0)
+			{
+				sender.sendMessage(ChatColor.RED + "Can't select a special region!");
+			}
 			else if(conf.contains("worlds." + w + "." + args[1]))
 			{
 				ConfigurationSection r = conf.getConfigurationSection("worlds." + w + "." + args[1]);
 				int xmin = r.getInt("xmin");
 				int xmax = r.getInt("xmax");
-				if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
+				if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;}
 				int zmin = r.getInt("zmin");
 				int zmax = r.getInt("zmax");
-				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;} 
+				if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
 				
 				xmin *= 16;
 				xmax = xmax * 16 + 15;
@@ -365,7 +368,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				{
 					int xmin = wc.getInt(r + ".xmin");
 					int xmax = wc.getInt(r + ".xmax");
-					if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
+					if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;}
 					int zmin = wc.getInt(r + ".zmin");
 					int zmax = wc.getInt(r + ".zmax");
 					if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
@@ -394,7 +397,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 					ConfigurationSection r = conf.getConfigurationSection("worlds." + w + "." + args[1]);
 					int xmin = r.getInt("xmin");
 					int xmax = r.getInt("xmax");
-					if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;} 
+					if(xmax < xmin) {int tmp = xmax; xmax = xmin; xmin = tmp;}
 					int zmin = r.getInt("zmin");
 					int zmax = r.getInt("zmax");
 					if(zmax < zmin) {int tmp = zmax; zmax = zmin; zmin = tmp;}
@@ -454,7 +457,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			return true;
 		}
 		
-		return false;	
+		return false;
 	}
 	
 	@EventHandler
