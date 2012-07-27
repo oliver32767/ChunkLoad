@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.InputMismatchException;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
@@ -65,7 +66,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	{
 		conf = getConfig();
 		/* update config files of previous versions */
-		int version = rc.getInt("version", 1);
+		int version = conf.getInt("version", 1);
 		if(!conf.contains("worlds")) {version = 0;}//very old or first use
 		if(version != configFileVersion) {updateConfig(version);}
 		
@@ -93,8 +94,8 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				/* weird version... */
 				//TODO
 				//logger.log(logger.severe, "unknown version number '" + from + "'\n");
-				throw new Exception("ChunkLoad: unknown config version number '" + from + "'");//TODO: find a better exception
-				break;
+				throw new InputMismatchException("ChunkLoad: unknown config version number '" + from + "'");//TODO: find a better exception
+				//break;// unreachable
 		}
 	}
 	
@@ -228,7 +229,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			if(wc == null) {wc = conf.createSection("worlds." + w);}
 			ConfigurationSection r = wc.createSection(args[1]);
 			
-			if(Arrays.binarySearch(specilaregions, args[1])
+			if(Arrays.binarySearch(specialRegions, args[1]) >= 0)
 			{
 				sender.sendMessage(ChatColor.YELLOW + "Region '" + args[1] + "' added.");
 			}
@@ -321,7 +322,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			{
 				sender.sendMessage(ChatColor.RED + "Invalid region name!");
 			}
-			else if(Arrays.binarySearch(specialRegions, s) >= 0)
+			else if(Arrays.binarySearch(specialRegions, args[1]) >= 0)
 			{
 				sender.sendMessage(ChatColor.RED + "Can't select a special region!");
 			}
@@ -386,7 +387,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 					continue;
 				}
 				ConfigurationSection rc = wc.getConfigurationSection(r + ".config");
-				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + (Arrays.binarySearch(specialRegions, r) >= 0? "" : ": " + coords(rc.parent())) + regionDescription(rc));
+				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + (Arrays.binarySearch(specialRegions, r) >= 0? "" : ": " + coords(rc.getParent())) + regionDescription(rc));
 				done++;
 				if(done >= 10) {break;}
 			}
@@ -407,7 +408,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				
 				if(args.length == 2)
 				{//show configuration
-					sender.sendMessage(ChatColor.YELLOW + args[1] + (Arrays.binarySearch(specialRegions, r) >= 0? "" : ": " + coords(rc.parent())));
+					sender.sendMessage(ChatColor.YELLOW + args[1] + (Arrays.binarySearch(specialRegions, args[1]) >= 0? "" : ": " + coords(rc.getParent())));
 					String msg = regionDescription(rc);
 					sender.sendMessage(ChatColor.YELLOW + "Configuration: " + (msg.length() > 0? msg : "default"));
 				}
@@ -474,8 +475,8 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		boolean cancel = false;
 		if(conf.contains("worlds." + w + ".__global__"))
 		{
-			ConfigurationSection r = conf.getConfigurationSection("worlds." + w + ".__global__");
-			if(!rc.contains("config.inactive") || rc.getBoolean("config.inactive", true)) {cancel = true;}
+			//ConfigurationSection r = conf.getConfigurationSection("worlds." + w + ".__global__");
+			if(conf.getBoolean("worlds." + w + ".__global__.config.inactive")) {cancel = true;}
 		}
 		// check if chunk can unload
 		// cancel the unload event if it's not supposed to unload
@@ -484,7 +485,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			ChunkLoadChunk clc = keepLoaded.get(w).get(coords2long(c));
 			for(ConfigurationSection r : clc.getRegions())
 			{
-				if(!r.getBoolean("config.inactive"))
+				if(r.getBoolean("config.inactive"))
 				{
 					cancel = true;
 					break;
