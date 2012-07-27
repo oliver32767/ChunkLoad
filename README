@@ -25,13 +25,25 @@ Usage:
 /cl is an alias to /chunkload
 all subcommands except reload can be abbreviated to their first letter
 
+
+Special Regions:
+	- __global__: a region containing a complete world
+
+
 To use ChunkLoad you need either the chunkload.usage permission or (if enabled in the configuration) be an operator on the server 
 
+
 Configuration:
-allow-ops - allow operators to use ChunkLoad even if they don't have the required permissions; default: true
-worlds.<worldname>.<regionname> - rectangles of chunks to keep loaded, manual editing at your own risk
+The keys you may find in the config.yml
+allow-ops - allow operators to use ChunkLoad even if they don't have the required permission; default: true
+
+The following keys are listed here for completeness, but shouldn't be edited manually
+version - version of the data structure in config.yml
+worlds.<worldname>.<regionname> - rectangles of chunks to keep loaded
+
 
 Todo:
-- have a look at the ForeverALoad features and implement them
+	- have a look at the ForeverALoad features and implement them
+
 
 This plugin is licensed under GPLv2 or (at your option) any later version
