@@ -156,8 +156,8 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				String rn = region.getName();
 				if(!rn.matches("^r\\.-?[0-9]+\\.-?[0-9]+\\.mca$")) {continue;}
 				/* open file, read index, transform to chunks */
-				int x = Integer.parseInt(rn.substring(2));
-				int z = Integer.parseInt(rn.substring(rn.indexOf('.', 2) + 1));
+				int x = Integer.parseInt(rn.substring(2, rn.indexOf('.', 2)));
+				int z = Integer.parseInt(rn.substring(rn.indexOf('.', 2) + 1), rn.length() - 4);
 				try
 				{
 					DataInputStream d = new DataInputStream(new FileInputStream(region));
