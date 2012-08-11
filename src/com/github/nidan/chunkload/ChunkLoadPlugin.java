@@ -129,12 +129,12 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 			boolean load = rc.getBoolean("config.load-on-start");
 			for(int x = xmin; x <= xmax; x++) for(int z = zmin; z <= zmax; z++)
 			{
-				Chunk c = world.getChunkAt(x, z);
-				ChunkLoadChunk clc = chunks.get(c);
-				if(clc == null) {clc = new ChunkLoadChunk(world, c);}
+				long coords = coords2long(x, z);
+				ChunkLoadChunk clc = chunks.get(coords);
+				if(clc == null) {clc = new ChunkLoadChunk(world, x, z);}
 				clc.addRegion(rc);
-				chunks.put(coords2long(c), clc);
-				if(load) {c.load(false);}
+				chunks.put(coords, clc);
+				if(load) {world.getChunkAt(x, z).load(false);}
 			}
 		}
 		keepLoaded.put(w, chunks);
@@ -269,11 +269,11 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				}
 				for(int x = xmin ; x <= xmax; x++) for(int z = zmin; z <= zmax; z++)
 				{
-					Chunk c = world.getChunkAt(x, z);
-					ChunkLoadChunk clc = chunks.get(c);
-					if(clc == null) {clc = new ChunkLoadChunk(world, world.getChunkAt(x, z));}
+					long coords = coords2long(x, z);
+					ChunkLoadChunk clc = chunks.get(coords);
+					if(clc == null) {clc = new ChunkLoadChunk(world, x, z);}
 					clc.addRegion(r);
-					chunks.put(coords2long(c), clc);
+					chunks.put(coords, clc);
 				}
 				sender.sendMessage(ChatColor.YELLOW + "Keeping " + (xmax - xmin + 1) * (zmax - zmin + 1) + " chunks loaded in region '" + args[1] + "'.");
 			}
@@ -303,9 +303,10 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 					{
 						for(int x = xmin ; x <= xmax; x++) for(int z = zmin; z <= zmax; z++)
 						{{
-							ChunkLoadChunk clc = chunks.get(coords2long(x, z));
+							long coords = coords2long(x, z);
+							ChunkLoadChunk clc = chunks.get(coords);
 							clc.removeRegion(r);
-							if(clc.getRegions().size() <= 0) {chunks.remove(world.getChunkAt(x, z));}
+							if(clc.getRegions().size() <= 0) {chunks.remove(coords);}
 						}}
 					}
 				}
@@ -476,16 +477,16 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 		if(conf.contains("worlds." + w + ".__global__"))
 		{
 			//ConfigurationSection r = conf.getConfigurationSection("worlds." + w + ".__global__");
-			if(conf.getBoolean("worlds." + w + ".__global__.config.inactive")) {cancel = true;}
+			if(!conf.getBoolean("worlds." + w + ".__global__.config.inactive")) {cancel = true;}
 		}
 		// check if chunk can unload
 		// cancel the unload event if it's not supposed to unload
 		if(!cancel && keepLoaded.get(w) != null && keepLoaded.get(w).containsKey(coords2long(c)))
 		{
 			ChunkLoadChunk clc = keepLoaded.get(w).get(coords2long(c));
-			for(ConfigurationSection r : clc.getRegions())
+			for(ConfigurationSection r: clc.getRegions())
 			{
-				if(r.getBoolean("config.inactive"))
+				if(!r.getBoolean("config.inactive"))
 				{
 					cancel = true;
 					break;

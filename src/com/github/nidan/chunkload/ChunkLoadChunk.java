@@ -22,6 +22,14 @@ public class ChunkLoadChunk
 		configs = new HashSet<ConfigurationSection>();
 	}
 	
+	ChunkLoadChunk(World w, int x, int z)
+	{
+		world = w;
+		this.x = x;
+		this.z = z;
+		configs = new HashSet<ConfigurationSection>();
+	}
+	
 	protected void addRegion(ConfigurationSection conf)
 	{
 		configs.add(conf);
