@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
@@ -38,6 +40,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	private Map<String, Map<Long, ChunkLoadChunk>> keepLoaded;
 	private FileConfiguration conf;
 	private WorldEditPlugin we;
+	private Logger logger;
 	
 	/* MUST be sorted */
 	public static final String[] specialRegions = {"__global__"};
@@ -49,6 +52,8 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	public ChunkLoadPlugin()
 	{
 		keepLoaded = new HashMap<String, Map<Long, ChunkLoadChunk>>();
+		logger = Logger.getLogger("ChunkLoad");
+		logger.setLevel(Level.WARNING);
 	}
 	
 	public void onEnable()
@@ -87,14 +92,14 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				}
 				else {conf.createSection("worlds");}
 				conf.set("allow-ops", true);
+				/* fall through */
 			//case 1:
 				// ...
 				break;
 			default:
 				/* weird version... */
-				//TODO
-				//logger.log(logger.severe, "unknown version number '" + from + "'\n");
-				throw new InputMismatchException("ChunkLoad: unknown config version number '" + from + "'");//TODO: find a better exception
+				logger.log(Level.SEVERE, "unknown version number '" + from + "'\n");
+				throw new InputMismatchException("ChunkLoad: unknown config version number '" + from + "'");
 				//break;// unreachable
 		}
 	}
@@ -388,7 +393,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 					continue;
 				}
 				ConfigurationSection rc = wc.getConfigurationSection(r + ".config");
-				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + (Arrays.binarySearch(specialRegions, r) >= 0? "" : ": " + coords(rc.getParent())) + regionDescription(rc));
+				sender.sendMessage((start + done - 1) + ": " + ChatColor.YELLOW + r + (Arrays.binarySearch(specialRegions, r) >= 0? "" : ": " + coords(wc.getConfigurationSection(r))) + regionDescription(rc));
 				done++;
 				if(done >= 10) {break;}
 			}
@@ -505,6 +510,9 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 				},
 				1);
 		}
+		
+		logger.log(Level.INFO, "Unloading of " + w + "/" + c.getX() + "-" + c.getZ() + (cancel? " STOPPED!" : "."));
+		
 		return;
 	}
 	
@@ -548,6 +556,7 @@ public class ChunkLoadPlugin extends JavaPlugin implements Listener
 	
 	private static String regionDescription(ConfigurationSection rc)
 	{
+		if(rc == null) {return "";}
 		String ret = "";
 		for(String o: regionOptions) {if(rc.getBoolean(o)) {ret += ", " + o ;}}
 		return ret.length() > 0? ChatColor.AQUA + " -" + ret.substring(1) : "";
